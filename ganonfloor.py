@@ -54,14 +54,32 @@ def read_f32(f):
 def print_bgactor(f, i):
     seek(f, 0x801C9520 + 0x54 + i * 0x64)
     addr = read_u32(f)
+    col_header = read_u32(f)
+    poly_start_index = read_u16(f)
+    ceiling_list = read_u16(f)
+    wall_list = read_u16(f)
+    floor_list = read_u16(f)
+    vertex_start_index = read_u16(f)
+
     seek(f, addr)
     actor_id = read_u16(f)
     actor_cat = read_u8(f)
-    print('bgactor {}: name={} id={:04X} cat={} addr={:08X}'.format(i,  ACTOR_NAMES[actor_id], actor_id, actor_cat, addr))
+    print('bgactor {}: name={} id={:04X} cat={} addr={:08X} vertex_start={} ({:08X}) poly_start={} ({:08X})'.format(
+        i,  ACTOR_NAMES[actor_id], actor_id, actor_cat, addr,
+        vertex_start_index, 0x8025B7F0 + vertex_start_index * 0x6,
+        poly_start_index, 0x8025C3F0 + poly_start_index * 0x10))
 
 def print_bgactors(f):
     for i in range(48):
         print_bgactor(f, i)
+
+def read_vertex(f, index):
+    seek(f, 0x8037E9A8 + index * 0x6)
+    x = read_s16(f)
+    y = read_s16(f)
+    z = read_s16(f)
+    return (x, y, z)
+    print('  vertex {}: ({},{},{})'.format(index, x, y, z))
 
 def print_poly(f, addr):
     seek(f, addr)
@@ -79,6 +97,7 @@ def print_poly(f, addr):
     v3 = read_vertex(f, i3)
 
     print('      type: 0x{:04X}'.format(poly_type))
+    print('      flags: 0x{:01X}'.format(i1 >> 13))
     print('      v1: ({}, {}, {})'.format(v1[0], v1[1], v1[2]))
     print('      v2: ({}, {}, {})'.format(v2[0], v2[1], v2[2]))
     print('      v3: ({}, {}, {})'.format(v3[0], v3[1], v3[2]))
@@ -135,16 +154,8 @@ def print_sectors(f):
                 print_poly_list(f, floor)
                 print('  walls:')
                 print_poly_list(f, wall)
-                # print('  ceiling:')
-                # print_poly_list(f, ceiling)
-
-def read_vertex(f, index):
-    seek(f, 0x8037E9A8 + index * 0x6)
-    x = read_s16(f)
-    y = read_s16(f)
-    z = read_s16(f)
-    return (x, y, z)
-    print('  vertex {}: ({},{},{})'.format(index, x, y, z))
+                print('  ceiling:')
+                print_poly_list(f, ceiling)
 
 def main():
     parser = argparse.ArgumentParser(description='Ganonfloor memory dump viewer')
