@@ -9,14 +9,6 @@ COLPOLY_NORMAL_FRAC = 1.0 / SHT_MAX
 
 COL_CTX = 0x801C9520
 
-ACTOR_NAMES = {
-    0x000A: 'En_Box',
-    0x003F: 'Bg_Dodoago',
-    0x0058: 'Bg_Ddan_Jd',
-    0x0059: 'Bg_Breakwall',
-    0x012A: 'Obj_Switch',
-}
-
 args = None
 
 def seek(f, addr):
@@ -76,6 +68,10 @@ class ColData:
             self.node_tbl = read_u32(f)
             self.poly_check_tbl = read_u32(f)
 
+            seek(f, COL_CTX + 0x50 + 0x13F0)
+            self.dyna_poly_tbl = read_u32(f)
+            self.dyna_vertex_tbl = read_u32(f)
+
             seek(f, self.col_header + 0x0C)
             self.num_vertices = read_u32(f)
             self.vertex_tbl = read_u32(f)
@@ -83,12 +79,37 @@ class ColData:
             self.poly_tbl = read_u32(f)
             self.surface_type_tbl = read_u32(f)
 
-def print_bgactor(f, i):
-    seek(f, COL_CTX + 0x50 + 0x13F0)
-    dyna_poly_tbl = read_u32(f)
-    dyna_vertex_tbl = read_u32(f)
+def print_col_data(f, col_data):
+    print('col_header: {:08X}'.format(col_data.col_header))
+    print('min_x: {:.4}'.format(col_data.min_x))
+    print('min_y: {:.4}'.format(col_data.min_y))
+    print('min_z: {:.4}'.format(col_data.min_z))
+    print('amount_x: {}'.format(col_data.amount_x))
+    print('amount_y: {}'.format(col_data.amount_y))
+    print('amount_z: {}'.format(col_data.amount_z))
+    print('length_x: {:.4}'.format(col_data.length_x))
+    print('length_y: {:.4}'.format(col_data.length_y))
+    print('length_z: {:.4}'.format(col_data.length_z))
+    print('lookup_tbl: {:08X}'.format(col_data.lookup_tbl))
+    print('node_max: {:04X}'.format(col_data.node_max))
+    print('node_count: {:04X}'.format(col_data.node_count))
+    print('node_tbl: {:08X}'.format(col_data.node_tbl))
+    print('poly_check_tbl: {:08X}'.format(col_data.poly_check_tbl))
+    print('dyna_poly_tbl: {:08X}'.format(col_data.dyna_poly_tbl))
+    print('dyna_vertex_tbl: {:08X}'.format(col_data.dyna_vertex_tbl))
+    print('num_vertices: {:04X}'.format(col_data.num_vertices))
+    print('vertex_tbl: {:08X}'.format(col_data.vertex_tbl))
+    print('num_polys: {:04X}'.format(col_data.num_polys))
+    print('poly_tbl: {:08X}'.format(col_data.poly_tbl))
+    print('surface_type_tbl: {:08X}'.format(col_data.surface_type_tbl))
 
-    seek(f, COL_CTX + 0x54 + i * 0x64)
+def print_bgactor(f, col_data, i):
+    seek(f, COL_CTX + 0x50 + 0x138C + i * 0x2)
+    flags = read_u16(f)
+    if not (flags & 0x01):
+        return
+
+    seek(f, COL_CTX + 0x50 + 0x4 + i * 0x64)
     addr = read_u32(f)
     col_header = read_u32(f)
     poly_start_index = read_u16(f)
@@ -100,14 +121,14 @@ def print_bgactor(f, i):
     seek(f, addr)
     actor_id = read_u16(f)
     actor_cat = read_u8(f)
-    print('bgactor {}: name={} id={:04X} cat={} addr={:08X} vertex_start={} ({:08X}) poly_start={} ({:08X})'.format(
-        i,  ACTOR_NAMES[actor_id], actor_id, actor_cat, addr,
-        vertex_start_index, dyna_poly_tbl + vertex_start_index * 0x6,
-        poly_start_index, dyna_poly_tbl + poly_start_index * 0x10))
+    print('bgactor {}: id={:04X} cat={} addr={:08X} vertex_start={} ({:08X}) poly_start={} ({:08X})'.format(
+        i, actor_id, actor_cat, addr,
+        vertex_start_index, col_data.dyna_poly_tbl + vertex_start_index * 0x6,
+        poly_start_index, col_data.dyna_poly_tbl + poly_start_index * 0x10))
 
-def print_bgactors(f):
-    for i in range(48):
-        print_bgactor(f, i)
+def print_bgactors(f, col_data):
+    for i in range(50):
+        print_bgactor(f, col_data, i)
 
 def read_vertex(f, col_data, index):
     seek(f, col_data.vertex_tbl + index * 0x6)
@@ -207,7 +228,9 @@ def main():
 
     with open(args.filename, 'rb') as f:
         col_data = ColData(f)
-        # print_bgactors(f)
+
+        # print_col_data(f, col_data)
+        # print_bgactors(f, col_data)
         print_sectors(f, col_data)
 
 if __name__ == '__main__':
