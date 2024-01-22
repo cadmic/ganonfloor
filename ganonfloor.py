@@ -143,7 +143,14 @@ def print_poly(f, col_data, addr):
     print('      dist: {}'.format(dist, dist))
 
 def print_poly_list(f, col_data, node):
+    visited = set()
+
     while node != 0xFFFF:
+        if node in visited:
+            print('    node={:04X} <loop>'.format(node))
+            break
+        visited.add(node)
+
         node_addr = col_data.node_tbl + node * 0x4
         seek(f, node_addr)
         poly_id = read_u16(f)
