@@ -7,6 +7,8 @@ import sys
 SHT_MAX = 0x7FFF
 COLPOLY_NORMAL_FRAC = 1.0 / SHT_MAX
 
+COL_CTX = 0x801C9520
+
 ACTOR_NAMES = {
     0x000A: 'En_Box',
     0x003F: 'Bg_Dodoago',
@@ -51,8 +53,42 @@ def read_f32(f):
     [x] = struct.unpack('>f', f.read(4))
     return x
 
+class ColData:
+    def __init__(self, f):
+            seek(f, COL_CTX)
+            self.col_header = read_u32(f)
+            self.min_x = read_f32(f)
+            self.min_y = read_f32(f)
+            self.min_z = read_f32(f)
+
+            seek(f, COL_CTX + 0x1C)
+            self.amount_x = read_u32(f)
+            self.amount_y = read_u32(f)
+            self.amount_z = read_u32(f)
+            self.length_x = read_f32(f)
+            self.length_y = read_f32(f)
+            self.length_z = read_f32(f)
+
+            seek(f, COL_CTX + 0x40)
+            self.lookup_tbl = read_u32(f)
+            self.node_max = read_u16(f)
+            self.node_count = read_u16(f)
+            self.node_tbl = read_u32(f)
+            self.poly_check_tbl = read_u32(f)
+
+            seek(f, self.col_header + 0x0C)
+            self.num_vertices = read_u32(f)
+            self.vertex_tbl = read_u32(f)
+            self.num_polys = read_u32(f)
+            self.poly_tbl = read_u32(f)
+            self.surface_type_tbl = read_u32(f)
+
 def print_bgactor(f, i):
-    seek(f, 0x801C9520 + 0x54 + i * 0x64)
+    seek(f, COL_CTX + 0x50 + 0x13F0)
+    dyna_poly_tbl = read_u32(f)
+    dyna_vertex_tbl = read_u32(f)
+
+    seek(f, COL_CTX + 0x54 + i * 0x64)
     addr = read_u32(f)
     col_header = read_u32(f)
     poly_start_index = read_u16(f)
@@ -66,22 +102,22 @@ def print_bgactor(f, i):
     actor_cat = read_u8(f)
     print('bgactor {}: name={} id={:04X} cat={} addr={:08X} vertex_start={} ({:08X}) poly_start={} ({:08X})'.format(
         i,  ACTOR_NAMES[actor_id], actor_id, actor_cat, addr,
-        vertex_start_index, 0x8025B7F0 + vertex_start_index * 0x6,
-        poly_start_index, 0x8025C3F0 + poly_start_index * 0x10))
+        vertex_start_index, dyna_poly_tbl + vertex_start_index * 0x6,
+        poly_start_index, dyna_poly_tbl + poly_start_index * 0x10))
 
 def print_bgactors(f):
     for i in range(48):
         print_bgactor(f, i)
 
-def read_vertex(f, index):
-    seek(f, 0x8037E9A8 + index * 0x6)
+def read_vertex(f, col_data, index):
+    seek(f, col_data.vertex_tbl + index * 0x6)
     x = read_s16(f)
     y = read_s16(f)
     z = read_s16(f)
     return (x, y, z)
     print('  vertex {}: ({},{},{})'.format(index, x, y, z))
 
-def print_poly(f, addr):
+def print_poly(f, col_data, addr):
     seek(f, addr)
     poly_type = read_u16(f)
     i1 = read_u16(f)
@@ -92,9 +128,9 @@ def print_poly(f, addr):
     nz = read_s16(f)
     dist = read_s16(f)
 
-    v1 = read_vertex(f, i1 & 0x1FFF)
-    v2 = read_vertex(f, i2 & 0x1FFF)
-    v3 = read_vertex(f, i3)
+    v1 = read_vertex(f, col_data, i1 & 0x1FFF)
+    v2 = read_vertex(f, col_data, i2 & 0x1FFF)
+    v3 = read_vertex(f, col_data, i3)
 
     print('      type: 0x{:04X}'.format(poly_type))
     print('      flags: 0x{:01X}'.format(i1 >> 13))
@@ -106,18 +142,18 @@ def print_poly(f, addr):
     print('      nz: {:.4}'.format(nz * COLPOLY_NORMAL_FRAC))
     print('      dist: {}'.format(dist, dist))
 
-def print_poly_list(f, node):
+def print_poly_list(f, col_data, node):
     while node != 0xFFFF:
-        node_addr = 0x8025F244 + node * 0x4
+        node_addr = col_data.node_tbl + node * 0x4
         seek(f, node_addr)
         poly_id = read_u16(f)
         next_node = read_u16(f)
 
-        poly_addr = 0x803704B8 + poly_id * 0x10
+        poly_addr = col_data.poly_tbl + poly_id * 0x10
         seek(f, poly_addr)
         poly_type = read_u16(f)
 
-        seek(f, 0x80370308 + poly_type * 0x8)
+        seek(f, col_data.surface_type_tbl + poly_type * 0x8)
         data0 = read_u32(f)
         data1 = read_u32(f)
 
@@ -126,37 +162,32 @@ def print_poly_list(f, node):
         print('    node={:04X} ({:08X}) poly_id={:04X} ({:08X}) type={:04X} exit_index={:03X}'.format(
             node, node_addr, poly_id, poly_addr, poly_type, exit_index))
         if args.print_polys:
-            print_poly(f, poly_addr)
+            print_poly(f, col_data, poly_addr)
         node = next_node
 
-def print_sectors(f):
-    seek(f, 0x801C9520 + 0x4)
-    min_x = read_f32(f)
-    min_y = read_f32(f)
-    min_z = read_f32(f)
-    seek(f, 0x801C9520 + 0x28)
-    length_x = read_f32(f)
-    length_y = read_f32(f)
-    length_z = read_f32(f)
-    for z in range(16):
-        for y in range(4):
-            for x in range(16):
-                index = x + y * 16 + z * 16 * 4
-                seek(f, 0x802747F0 + index * 0x6)
+def print_sectors(f, col_data):
+    for z in range(col_data.amount_z):
+        for y in range(col_data.amount_y):
+            for x in range(col_data.amount_x):
+                index = x + y * col_data.amount_x + z * col_data.amount_x * col_data.amount_y
+                seek(f, col_data.lookup_tbl + index * 0x6)
                 floor = read_u16(f)
                 wall = read_u16(f)
                 ceiling = read_u16(f)
                 print('sector {}: x=[{},{}] y=[{},{}] z=[{},{}]'.format(
                     index,
-                    min_x + x * length_x, min_x + (x + 1) * length_x,
-                    min_y + y * length_y, min_y + (y + 1) * length_y,
-                    min_z + z * length_z, min_z + (z + 1) * length_z))
+                    col_data.min_x + x * col_data.length_x,
+                    col_data.min_x + (x + 1) * col_data.length_x,
+                    col_data.min_y + y * col_data.length_y,
+                    col_data.min_y + (y + 1) * col_data.length_y,
+                    col_data.min_z + z * col_data.length_z,
+                    col_data.min_z + (z + 1) * col_data.length_z))
                 print('  floors:')
-                print_poly_list(f, floor)
+                print_poly_list(f, col_data, floor)
                 print('  walls:')
-                print_poly_list(f, wall)
+                print_poly_list(f, col_data, wall)
                 print('  ceiling:')
-                print_poly_list(f, ceiling)
+                print_poly_list(f, col_data, ceiling)
 
 def main():
     parser = argparse.ArgumentParser(description='Ganonfloor memory dump viewer')
@@ -168,8 +199,9 @@ def main():
     args = parser.parse_args()
 
     with open(args.filename, 'rb') as f:
+        col_data = ColData(f)
         # print_bgactors(f)
-        print_sectors(f)
+        print_sectors(f, col_data)
 
 if __name__ == '__main__':
     main()
