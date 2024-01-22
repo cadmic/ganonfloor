@@ -15,10 +15,10 @@ ACTOR_NAMES = {
     0x012A: 'Obj_Switch',
 }
 
-VC = False
+args = None
 
 def seek(f, addr):
-    if VC:
+    if args.vc:
         f.seek(addr - 0x80000000 + 0xE74000)
     else:
         f.seek(addr - 0x80000000)
@@ -125,7 +125,8 @@ def print_poly_list(f, node):
 
         print('    node={:04X} ({:08X}) poly_id={:04X} ({:08X}) type={:04X} exit_index={:03X}'.format(
             node, node_addr, poly_id, poly_addr, poly_type, exit_index))
-        print_poly(f, poly_addr)
+        if args.print_polys:
+            print_poly(f, poly_addr)
         node = next_node
 
 def print_sectors(f):
@@ -161,11 +162,10 @@ def main():
     parser = argparse.ArgumentParser(description='Ganonfloor memory dump viewer')
     parser.add_argument('filename', metavar='FILE', type=str, nargs='?', help='RAM dump')
     parser.add_argument('--vc', action='store_true', help='Interpret as VC MEM1 dump')
+    parser.add_argument('--print-polys', action='store_true', help='Print polygon data')
 
+    global args
     args = parser.parse_args()
-
-    global VC
-    VC = args.vc
 
     with open(args.filename, 'rb') as f:
         # print_bgactors(f)
