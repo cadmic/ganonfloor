@@ -7,15 +7,15 @@ import sys
 SHT_MAX = 0x7FFF
 COLPOLY_NORMAL_FRAC = 1.0 / SHT_MAX
 
+# defaults for N64 1.2
+RAM_OFFSET = 0
+GLOBAL_CTX = 0x801C8D60
 COL_CTX = 0x801C9520
 
-args = None
+PRINT_POLYS = False
 
 def seek(f, addr):
-    if args.vc:
-        f.seek(addr - 0x80000000 + 0xE74000)
-    else:
-        f.seek(addr - 0x80000000)
+    f.seek(addr - 0x80000000 + RAM_OFFSET)
 
 def read_s8(f):
     [x] = struct.unpack('>b', f.read(1))
@@ -47,6 +47,12 @@ def read_f32(f):
 
 class ColData:
     def __init__(self, f):
+            seek(f, GLOBAL_CTX + 0xB0)
+            self.scene_segment = read_u32(f)
+
+            seek(f, GLOBAL_CTX + 0x020D8 + 0xE2B0)
+            self.message_segment = read_u32(f)
+
             seek(f, COL_CTX)
             self.col_header = read_u32(f)
             self.min_x = read_f32(f)
@@ -80,6 +86,8 @@ class ColData:
             self.surface_type_tbl = read_u32(f)
 
 def print_col_data(f, col_data):
+    print('scene_segment: {:08X}'.format(col_data.scene_segment))
+    print('message_segment: {:08X}'.format(col_data.message_segment))
     print('col_header: {:08X}'.format(col_data.col_header))
     print('min_x: {:.4}'.format(col_data.min_x))
     print('min_y: {:.4}'.format(col_data.min_y))
@@ -189,7 +197,7 @@ def print_poly_list(f, col_data, node):
 
         print('    node={:04X} ({:08X}) poly_id={:04X} ({:08X}) type={:04X} exit_index={:03X}'.format(
             node, node_addr, poly_id, poly_addr, poly_type, exit_index))
-        if args.print_polys:
+        if PRINT_POLYS:
             print_poly(f, col_data, poly_addr)
         node = next_node
 
@@ -221,15 +229,29 @@ def main():
     parser = argparse.ArgumentParser(description='Ganonfloor memory dump viewer')
     parser.add_argument('filename', metavar='FILE', type=str, nargs='?', help='RAM dump')
     parser.add_argument('--vc', action='store_true', help='Interpret as VC MEM1 dump')
+    parser.add_argument('--gc', action='store_true', help='Interpret as GC RAM dump')
     parser.add_argument('--print-polys', action='store_true', help='Print polygon data')
 
-    global args
+    global RAM_OFFSET
+    global GLOBAL_CTX
+    global COL_CTX
+    global PRINT_POLYS
+
     args = parser.parse_args()
+
+    if args.vc:
+        RAM_OFFSET = 0xE74000
+    elif args.gc:
+        RAM_OFFSET = 0xB1C140
+        GLOBAL_CTX = 0x801C9660
+
+    COL_CTX = GLOBAL_CTX + 0x007C0
+    PRINT_POLYS = args.print_polys
 
     with open(args.filename, 'rb') as f:
         col_data = ColData(f)
 
-        # print_col_data(f, col_data)
+        print_col_data(f, col_data)
         # print_bgactors(f, col_data)
         print_sectors(f, col_data)
 
