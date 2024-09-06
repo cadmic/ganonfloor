@@ -132,13 +132,28 @@ def print_bgactor(f, col_data, i):
     floor_list = read_u16(f)
     vertex_start_index = read_u16(f)
 
+    seek(f, col_header + 0x0C)
+    num_vertices = read_u16(f)
+    _ = read_u16(f)
+    vertex_tbl = read_u32(f)
+    num_polys = read_u16(f)
+    _ = read_u16(f)
+    poly_tbl = read_u32(f)
+    surface_type_tbl = read_u32(f)
+
     seek(f, addr)
     actor_id = read_u16(f)
     actor_cat = read_u8(f)
-    print('bgactor {}: id={:04X} cat={} addr={:08X} vertex_start={} ({:08X}) poly_start={} ({:08X})'.format(
+    print('bgactor {}: id={:04X} cat={} addr={:08X} vertex_start={} vertex_end={} ({:08X}-{:08X}) poly_start={} poly_end={} ({:08X}-{:08X})'.format(
         i, actor_id, actor_cat, addr,
-        vertex_start_index, col_data.dyna_poly_tbl + vertex_start_index * 0x6,
-        poly_start_index, col_data.dyna_poly_tbl + poly_start_index * 0x10))
+        vertex_start_index,
+        vertex_start_index + num_vertices,
+        col_data.dyna_poly_tbl + vertex_start_index * 0x6,
+        col_data.dyna_poly_tbl + (vertex_start_index + num_vertices) * 0x6,
+        poly_start_index,
+        poly_start_index + num_polys,
+        col_data.dyna_poly_tbl + poly_start_index * 0x10,
+        col_data.dyna_poly_tbl + (poly_start_index + num_polys) * 0x10))
 
 def print_bgactors(f, col_data):
     for i in range(50):
