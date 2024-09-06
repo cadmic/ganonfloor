@@ -53,6 +53,9 @@ class ColData:
             seek(f, GLOBAL_CTX + 0x020D8 + 0xE2B0)
             self.message_segment = read_u32(f)
 
+            seek(f, GLOBAL_CTX + 0x01C24 + 0x008)
+            self.num_actors = read_u8(f)
+
             seek(f, COL_CTX)
             self.col_header = read_u32(f)
             self.min_x = read_f32(f)
@@ -90,6 +93,7 @@ class ColData:
 def print_col_data(f, col_data):
     print('scene_segment: 0x{:08X}'.format(col_data.scene_segment))
     print('message_segment: 0x{:08X}'.format(col_data.message_segment))
+    print('num_actors: {}'.format(col_data.num_actors))
     print('col_header: 0x{:08X}'.format(col_data.col_header))
     print('min_x: {:.1f}'.format(col_data.min_x))
     print('min_y: {:.1f}'.format(col_data.min_y))
