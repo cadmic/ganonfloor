@@ -144,12 +144,14 @@ def print_bgactor(f, col_data, i):
     seek(f, addr)
     actor_id = read_u16(f)
     actor_cat = read_u8(f)
-    print('bgactor {}: id={:04X} cat={} addr={:08X} vertex_start={} vertex_end={} ({:08X}-{:08X}) poly_start={} poly_end={} ({:08X}-{:08X})'.format(
+    print('bgactor {}: id={:04X} cat={} addr={:08X} num_vertices={} vertex_start={} vertex_end={} ({:08X}-{:08X}) num_polys={} poly_start={} poly_end={} ({:08X}-{:08X})'.format(
         i, actor_id, actor_cat, addr,
+        num_vertices,
         vertex_start_index,
         vertex_start_index + num_vertices,
         col_data.dyna_poly_tbl + vertex_start_index * 0x6,
         col_data.dyna_poly_tbl + (vertex_start_index + num_vertices) * 0x6,
+        num_polys,
         poly_start_index,
         poly_start_index + num_polys,
         col_data.dyna_poly_tbl + poly_start_index * 0x10,
