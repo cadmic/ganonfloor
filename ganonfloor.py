@@ -254,7 +254,7 @@ def main():
         col_data = ColData(f)
 
         print_col_data(f, col_data)
-        # print_bgactors(f, col_data)
+        print_bgactors(f, col_data)
         print_sectors(f, col_data)
 
 if __name__ == '__main__':
